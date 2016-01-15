@@ -1,0 +1,124 @@
+---
+title: "Reproducible Research PA1"
+author: "Pascal jean-Charles"
+date: "Wednesday, January 13, 2016"
+output: html_document
+---
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+#setwd("C:/Users/pjc/Documents/Reproducible")
+unzip("activity.zip") 
+activity <- read.csv("activity.csv", header=T, sep=",",na.strings="NA")
+head(activity)
+```
+
+Classify the data to be used for the analysis and remove NA values from results
+
+```{r}
+activity$date <- as.Date(activity$date)
+clean_activity <- subset(activity, !is.na(activity$steps))
+```
+ What is mean total number of steps taken per day?
+Produce histogram to display the distribution of these figures.
+```{r}
+d_steps_count <- tapply(clean_activity$steps, clean_activity$date, sum, na.rm=TRUE, simplify=T)
+
+```
+remove NA from count
+
+```{r echo=FALSE}
+d_steps_count <- d_steps_count[!is.na(d_steps_count)]
+## Fig. 1 
+hist(x=d_steps_count,breaks=20,xlab="Daily total steps",ylab="Frequency",col="red",
+     main="The distribution of daily total (missing data ignored)")
+
+## Calculate the mean and median total of daily steps
+mean(d_steps_count)
+## [1] 10766
+median(d_steps_count)
+## [1] 10765
+#Mean is 10766 steps 
+#Median is 10765 steps.
+```
+What is the average daily activity pattern?
+Create the time series of daily activity pattern
+
+```{r echo=FALSE}
+avg_interval <- tapply(clean_activity$steps, clean_activity$interval, mean, na.rm=TRUE, simplify=T)
+activity_int <- data.frame(interval=as.integer(names(avg_interval)), avg=avg_interval)
+with(activity_int,plot(interval,avg,type="l",
+          xlab="5-minute intervals",
+          ylab="average steps in the interval across all days"))
+
+max_steps_interval <- max(activity_int$avg)
+activity_int[activity_int$avg == max_steps_interval, ]
+##     interval   avg
+## 835      835 206.2
+```
+Imputing missing values
+Number of NA records
+```{r}
+sum(is.na(activity$steps))
+## [1] 2304
+## 2304 observations with NA values
+```
+
+Imputation: create a new dataset where NA values is replaced with the mean value
+```{r}
+activity_imputed <- activity
+  x_na <- is.na(activity_imputed$steps)
+interval_avg <- tapply(clean_activity$steps, clean_activity$interval, mean, na.rm=TRUE, simplify=T)
+activity_imputed$steps[x_na] <- interval_avg[as.character(activity_imputed$interval[x_na])]
+```
+Second representation of the data based on imputation of the mean.
+```{r echo=FALSE}
+d_steps_count2 <- tapply(activity_imputed$steps, activity_imputed$date, sum, na.rm=TRUE, simplify=T)
+hist(x=d_steps_count2,
+     col="red",
+     breaks=20,
+     xlab="daily steps",
+     ylab="frequency",
+     main="The distribution of daily total (with missing data imputed)")
+```
+
+```{r}
+## new mean result
+mean(d_steps_count2)
+## [1] 10766
+median(d_steps_count2)
+## [1] 10766
+```
+After imputed data has been applied we got a new mean of 10766 and a new median of 10766.
+Are there differences in activity patterns between weekdays and weekends?
+Get new factor variable "wk" in the dataset with two levels - "weekday" and "weekend" indicating whether a given date is a weekday or weekend day.
+```{r}
+## helper function to decide if a day is a week day or not
+is_weekday <- function(d) {
+wd <- weekdays(d)
+ifelse (wd == "Saturday" | wd == "Sunday", "weekend", "weekday")
+}
+wks<- sapply(activity_imputed$date, is_weekday)
+activity_imputed$wk <- as.factor(wks)
+head(activity_imputed)
+```
+
+Five-minute interval (x-axis) and the average number of steps taken, averaged across all ## weekday days or weekend days (y-axis).
+```{r echo=FALSE}
+activity_wk <- aggregate(steps ~ wk+interval, data=activity_imputed, FUN=mean)
+
+library(lattice)
+xyplot(steps ~ interval | factor(wk),
+layout = c(1, 2),
+xlab="Interval",
+ylab="Number of steps",
+type="l",
+lty=1,
+data=activity_wk)
+
+## In conclusion we see from the plot that weekday activities started earlier than weekend activities.
+## We also observed that week-end activities are higher than weekday activities.
+```
